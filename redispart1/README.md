@@ -1,5 +1,6 @@
 Explanation:
 Server Code:
+
 Setup Socket: Create a TCP socket using socket().
 Set Options: Enable the SO_REUSEADDR option to allow the socket to be reused.
 Bind: Assign a port and IP address to the socket using bind().
