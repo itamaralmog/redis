@@ -1,66 +1,75 @@
+#include <stdio.h>          // Standard I/O functions
+#include <string.h>         // String handling functions
+#include <unistd.h>         // POSIX API for system calls
+#include <arpa/inet.h>      // Definitions for internet operations
+#include <sys/socket.h>     // Definitions for sockets
+#include <netinet/ip.h>     // Definitions for internet protocols
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/ip.h>
-
+// Print a message to stderr
 static void msg(const char *msg) {
     fprintf(stderr, "%s\n", msg);
 }
 
-static void do_something(int connfd) {
-    char rbuf[64] = {};
-    ssize_t n = read(connfd, rbuf, sizeof(rbuf) - 1);
+// Function to handle client communication
+static void handle_client(int connfd) {
+    char buffer[64] = {};
+    // Read data from client
+    ssize_t n = read(connfd, buffer, sizeof(buffer) - 1);
     if (n < 0) {
         msg("read() error");
         return;
     }
-    printf("client says: %s\n", rbuf);
+    printf("client says: %s\n", buffer);
 
-    char wbuf[] = "world";
-    write(connfd, wbuf, strlen(wbuf));
+    // Respond to client
+    char response[] = "world";
+    write(connfd, response, strlen(response));
 }
 
-int main(){
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
-    
-    int val = 1;
-    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+int main() {
+    // Create a TCP socket
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+        perror("socket()");
+        return 1;
+    }
 
-    // bind, this is the syntax that deals with IPv4 addresses
+    // Allow socket address reuse
+    int val = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+    // Bind the socket to an address and port
     struct sockaddr_in addr = {};
     addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
-    addr.sin_addr.s_addr = ntohl(0);    // wildcard address 0.0.0.0
-    int rv = bind(fd, (const sockaddr *)&addr, sizeof(addr));
-    if (rv) {
-        // die("bind()");
+    addr.sin_port = htons(1234);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(server_fd, (const sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind()");
+        return 1;
     }
 
-     // listen
-    rv = listen(fd, SOMAXCONN);
-    if (rv) {
-        // die("listen()");
+    // Listen for incoming connections
+    if (listen(server_fd, SOMAXCONN) < 0) {
         perror("listen()");
+        return 1;
     }
-    while (true) {
-        // accept
+
+    // Accept and handle incoming connections in an infinite loop
+    while (1) {
         struct sockaddr_in client_addr = {};
         socklen_t addrlen = sizeof(client_addr);
-        int connfd = accept(fd, (struct sockaddr *)&client_addr, &addrlen);
+        int connfd = accept(server_fd, (struct sockaddr *)&client_addr, &addrlen);
         if (connfd < 0) {
-            continue;   // error
+            perror("accept()");
+            continue;
         }
 
-        do_something(connfd);
-        close(connfd);
+        // Handle the client communication
+        handle_client(connfd);
+        close(connfd); // Close the connection with the client
     }
-}
 
-// g++ -Wall -Wextra -O2 -g client.cpp -o client
+    close(server_fd); // Close the server socket
+    return 0;
+}

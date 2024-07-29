@@ -134,6 +134,3 @@ int main(){
 
     
 }
-
-// g++ -Wall -Wextra -O2 -g client.cpp -o client
-// rm -f client server

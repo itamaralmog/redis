@@ -1,42 +1,47 @@
-#include <stdint.h>
+#include <stdio.h>          // Standard I/O functions
+#include <string.h>         // String handling functions
+#include <unistd.h>         // POSIX API for system calls
+#include <arpa/inet.h>      // Definitions for internet operations
+#include <sys/socket.h>     // Definitions for sockets
+#include <netinet/ip.h>     // Definitions for internet protocols
 #include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include <errno.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/ip.h>
 
-int main(){
-        int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd < 0) {
-        // die("socket()");
-        perror("socket()");
-    }
-
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ntohs(1234);
-    addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);  // 127.0.0.1
-    int rv = connect(fd, (const struct sockaddr *)&addr, sizeof(addr));
-    if (rv) {
-        // die("connect");
-        perror("connect");
-    }
-
-    char msg[] = "hello";
-    write(fd, msg, strlen(msg));
-
-    char rbuf[64] = {};
-    ssize_t n = read(fd, rbuf, sizeof(rbuf) - 1);
-    if (n < 0) {
-        // die("read");
-        perror("read");
-    }
-    printf("server says: %s\n", rbuf);
-    close(fd);
+// Function to print error message and abort the program
+static void die(const char *msg) {
+    perror(msg);
+    abort();
 }
 
-// g++ -Wall -Wextra -O2 -g client.cpp -o client
-// rm -f client server
+int main() {
+    // Create a TCP socket
+    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (client_fd < 0) {
+        die("socket()");
+    }
+
+    // Define the server address to connect to
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(1234);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    // Connect to the server
+    if (connect(client_fd, (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        die("connect()");
+    }
+
+    // Send a message to the server
+    char message[] = "hello";
+    write(client_fd, message, strlen(message));
+
+    // Read the response from the server
+    char buffer[64] = {};
+    ssize_t n = read(client_fd, buffer, sizeof(buffer) - 1);
+    if (n < 0) {
+        die("read()");
+    }
+    printf("server says: %s\n", buffer);
+
+    close(client_fd); // Close the client socket
+    return 0;
+}
